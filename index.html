@@ -524,7 +524,7 @@
 <div id="screen-draw" class="screen hidden">
   <div class="draw-header">
     <button class="btn-restart" id="btn-restart">リスタート</button>
-    <div class="draw-timer" id="draw-timer">20</div>
+    <div class="draw-timer" id="draw-timer">30</div>
     <button class="btn-answer"  id="btn-answer">答え合わせ</button>
   </div>
   <canvas id="canvas"></canvas>
@@ -911,7 +911,7 @@ let drawTimerInterval = null;
 
 function startDrawTimer() {
   clearInterval(drawTimerInterval);
-  let left = 20;
+  let left = 30;
   const el = document.getElementById('draw-timer');
   el.textContent = left;
   el.className = 'draw-timer';
