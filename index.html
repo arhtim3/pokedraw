@@ -451,7 +451,6 @@
       .draw-header { height: 64px; padding: 0 24px; }
       .draw-timer { font-size: 36px; min-width: 60px; }
       .btn-restart, .btn-answer { font-size: 16px; padding: 8px 22px; }
-      #canvas { max-height: 56vh; }
 
       .toolbar { padding: 12px 18px 16px; gap: 12px; }
       .color-swatch { width: 40px; height: 40px; }
@@ -939,10 +938,56 @@ function stopDrawTimer() {
   clearInterval(drawTimerInterval);
 }
 
+/* ─── Crop drawing to subject (auto-trim whitespace + padding) ─── */
+function cropDrawingToSubject() {
+  const w = canvas.width, h = canvas.height;
+  const data = ctx.getImageData(0, 0, w, h).data;
+
+  let minX = w, minY = h, maxX = 0, maxY = 0, found = false;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (data[i] < 235 || data[i + 1] < 235 || data[i + 2] < 235) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+        found = true;
+      }
+    }
+  }
+
+  if (!found) return canvas.toDataURL();
+
+  /* padding: 12% of the subject's larger side (similar to official artwork margin) */
+  const pad = Math.round(Math.max(maxX - minX + 1, maxY - minY + 1) * 0.12);
+  const x0 = Math.max(0, minX - pad);
+  const y0 = Math.max(0, minY - pad);
+  const x1 = Math.min(w - 1, maxX + pad);
+  const y1 = Math.min(h - 1, maxY + pad);
+  const cw = x1 - x0 + 1;
+  const ch = y1 - y0 + 1;
+
+  /* expand to square, centering the cropped region */
+  const sq = Math.max(cw, ch);
+  const ox = Math.round((sq - cw) / 2);
+  const oy = Math.round((sq - ch) / 2);
+
+  const oc = document.createElement('canvas');
+  oc.width = sq; oc.height = sq;
+  const oc2 = oc.getContext('2d');
+  oc2.fillStyle = '#ffffff';
+  oc2.fillRect(0, 0, sq, sq);
+  oc2.drawImage(canvas, x0, y0, cw, ch, ox, oy, cw, ch);
+
+  return oc.toDataURL();
+}
+
 /* ─── Answer check ─── */
 function showAnswer() {
   stopDrawTimer();
-  document.getElementById('answer-drawing').src  = canvas.toDataURL('image/png');
+  document.getElementById('answer-drawing').src  = cropDrawingToSubject();
   document.getElementById('answer-official').src = document.getElementById('pokemon-img').src;
   document.getElementById('answer-name').textContent = document.getElementById('pokemon-name').textContent;
   show('screen-answer');
