@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f3460">
+  <title>ポケモンお絵描きゲーム</title>
+  <style>
+    *, *::before, *::after {
+      margin: 0; padding: 0; box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue',
+        'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      background: #1a1a2e;
+      color: #fff;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* ── Screens ── */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .hidden { display: none !important; }
+
+    /* ── Start ── */
+    #screen-start {
+      background: linear-gradient(160deg, #0f3460 0%, #16213e 55%, #1a1a2e 100%);
+      gap: 20px;
+      padding: 28px 24px;
+      text-align: center;
+    }
+
+    .game-logo { font-size: 72px; line-height: 1; }
+
+    .game-title {
+      font-size: 30px;
+      font-weight: 900;
+      color: #FFCB05;
+      text-shadow: 3px 3px 0 #3D7DCA, 5px 5px 0 rgba(0,0,0,0.3);
+      letter-spacing: 0.05em;
+      line-height: 1.3;
+    }
+
+    .rules-box {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 16px;
+      padding: 16px 20px;
+      max-width: 320px;
+      width: 100%;
+      text-align: left;
+    }
+
+    .rules-box ol {
+      padding-left: 1.5em;
+      line-height: 2.1;
+      font-size: 14px;
+      color: #ccc;
+    }
+
+    .rules-box strong { color: #FFCB05; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #FFCB05, #FFA000);
+      color: #1a1a2e;
+      border: none;
+      padding: 16px 52px;
+      font-size: 22px;
+      font-weight: 900;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(255,203,5,0.45);
+      letter-spacing: 0.05em;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.95);
+      box-shadow: 0 3px 10px rgba(255,203,5,0.3);
+    }
+
+    /* ── Loading ── */
+    #screen-loading {
+      background: linear-gradient(160deg, #0f3460, #1a1a2e);
+      gap: 18px;
+    }
+
+    .spinner {
+      width: 60px; height: 60px;
+      border: 5px solid rgba(255,203,5,0.25);
+      border-top-color: #FFCB05;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Reveal ── */
+    #screen-reveal {
+      background: radial-gradient(ellipse at 50% 40%, #16213e 0%, #0f3460 60%, #1a1a2e 100%);
+      gap: 14px;
+      padding: 20px;
+    }
+
+    .reveal-hint {
+      font-size: 16px;
+      color: rgba(255,255,255,0.75);
+      letter-spacing: 0.05em;
+    }
+
+    #pokemon-img {
+      width: min(58vw, 230px);
+      height: min(58vw, 230px);
+      object-fit: contain;
+      filter: drop-shadow(0 0 28px rgba(255,203,5,0.55));
+      animation: float 2.5s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50%       { transform: translateY(-10px); }
+    }
+
+    #pokemon-name {
+      font-size: clamp(28px, 9vw, 42px);
+      font-weight: 900;
+      color: #FFCB05;
+      text-shadow: 2px 2px 0 #0f3460, 0 0 24px rgba(255,203,5,0.5);
+      letter-spacing: 0.1em;
+    }
+
+    /* SVG countdown ring */
+    .countdown-wrap {
+      position: relative;
+      width: 88px; height: 88px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .countdown-wrap svg {
+      position: absolute;
+      top: 0; left: 0;
+      transform: rotate(-90deg);
+    }
+
+    .c-bg {
+      fill: none;
+      stroke: rgba(255,255,255,0.15);
+      stroke-width: 6;
+    }
+
+    .c-fill {
+      fill: none;
+      stroke: #FFCB05;
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-dasharray: 251.2;  /* 2π × 40 */
+      stroke-dashoffset: 0;
+    }
+
+    #cd-num {
+      font-size: 38px;
+      font-weight: 900;
+      color: #fff;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Draw ── */
+    #screen-draw {
+      justify-content: flex-start;
+      align-items: stretch;
+      background: #e8e8e8;
+    }
+
+    .draw-header {
+      width: 100%;
+      background: #3D7DCA;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      height: 48px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+
+    .draw-header span { font-size: 15px; font-weight: 700; }
+
+    .btn-restart {
+      background: #FFCB05;
+      color: #1a1a2e;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .btn-restart:active { transform: scale(0.95); }
+
+    #canvas {
+      display: block;
+      touch-action: none;
+      flex: 1;
+      width: 100%;
+      cursor: crosshair;
+    }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      width: 100%;
+      background: #1c1c1c;
+      padding: 8px 10px 10px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .color-row {
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      padding: 2px 0 4px;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .color-row::-webkit-scrollbar { display: none; }
+
+    .color-swatch {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: transform 0.1s, border-color 0.1s;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
+    }
+
+    .color-swatch.active {
+      border-color: #fff;
+      transform: scale(1.3);
+    }
+
+    .tools-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .size-group { display: flex; gap: 4px; }
+
+    .size-btn {
+      background: #333;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 8px;
+      gap: 4px;
+      color: #aaa;
+      font-size: 12px;
+      transition: border-color 0.1s, color 0.1s;
+    }
+
+    .size-btn.active { border-color: #FFCB05; color: #fff; }
+
+    .size-dot { background: #ccc; border-radius: 50%; flex-shrink: 0; }
+
+    .vdiv {
+      width: 1px; height: 28px;
+      background: rgba(255,255,255,0.15);
+      margin: 0 2px;
+    }
+
+    .tool-btn {
+      background: #333;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      color: #ccc;
+      cursor: pointer;
+      padding: 5px 10px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      transition: border-color 0.1s, color 0.1s;
+    }
+
+    .tool-btn.active { border-color: #FFCB05; color: #fff; }
+
+    .spacer { flex: 1; }
+
+    .btn-clear {
+      background: #c0392b !important;
+      border-color: transparent !important;
+      color: #fff !important;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Start ── -->
+<div id="screen-start" class="screen">
+  <div class="game-logo">🎨</div>
+  <h1 class="game-title">ポケモン<br>お絵描きゲーム</h1>
+  <div class="rules-box">
+    <ol>
+      <li>「スタート！」を押す</li>
+      <li>一人だけ <strong>3秒間</strong> ポケモンを見る</li>
+      <li>そのポケモンを絵で描く</li>
+      <li>もう一人が何のポケモンか当てる！</li>
+    </ol>
+  </div>
+  <button class="btn-primary" id="btn-start">スタート！</button>
+</div>
+
+<!-- ── Loading ── -->
+<div id="screen-loading" class="screen hidden">
+  <div class="spinner"></div>
+  <p style="color:#FFCB05;font-size:15px;">ポケモンを選んでいます…</p>
+</div>
+
+<!-- ── Reveal ── -->
+<div id="screen-reveal" class="screen hidden">
+  <p class="reveal-hint">しっかり覚えてね！👀</p>
+  <img id="pokemon-img" src="" alt="Pokemon" draggable="false">
+  <div id="pokemon-name"></div>
+  <div class="countdown-wrap">
+    <svg width="88" height="88" viewBox="0 0 88 88">
+      <circle class="c-bg"   cx="44" cy="44" r="40"/>
+      <circle class="c-fill" id="c-fill" cx="44" cy="44" r="40"/>
+    </svg>
+    <span id="cd-num">3</span>
+  </div>
+</div>
+
+<!-- ── Draw ── -->
+<div id="screen-draw" class="screen hidden">
+  <div class="draw-header">
+    <span>🖊 描いてみよう！</span>
+    <button class="btn-restart" id="btn-restart">リスタート</button>
+  </div>
+  <canvas id="canvas"></canvas>
+  <div class="toolbar">
+    <div class="color-row" id="color-row"></div>
+    <div class="tools-row">
+      <div class="size-group">
+        <button class="size-btn active" data-size="4" id="size-s">
+          <span class="size-dot" style="width:6px;height:6px"></span>S
+        </button>
+        <button class="size-btn" data-size="11" id="size-m">
+          <span class="size-dot" style="width:11px;height:11px"></span>M
+        </button>
+        <button class="size-btn" data-size="22" id="size-l">
+          <span class="size-dot" style="width:17px;height:17px"></span>L
+        </button>
+      </div>
+      <div class="vdiv"></div>
+      <button class="tool-btn" id="btn-eraser">🧹 消しゴム</button>
+      <button class="tool-btn" id="btn-undo">↩ 戻す</button>
+      <div class="spacer"></div>
+      <button class="tool-btn btn-clear" id="btn-clear">🗑 全消し</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─── Constants ─── */
+const COLORS = [
+  '#000000','#555555','#aaaaaa','#ffffff',
+  '#e74c3c','#c0392b','#e67e22','#f39c12',
+  '#f1c40f','#2ecc71','#27ae60','#1abc9c',
+  '#3498db','#2980b9','#9b59b6','#8e44ad',
+  '#e91e63','#ff8a65','#795548','#d7ccc8',
+];
+
+const MAX_ID = 905; // Gen 1–9
+
+/* ─── State ─── */
+let color   = '#000000';
+let size    = 4;
+let eraser  = false;
+let drawing = false;
+let lastX   = 0, lastY = 0;
+let undoStack = [];
+
+/* ─── Canvas / context ─── */
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+/* ─── Screen helper ─── */
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+/* ─── Build color swatches ─── */
+const colorRow = document.getElementById('color-row');
+COLORS.forEach(c => {
+  const btn = document.createElement('button');
+  btn.className = 'color-swatch' + (c === color ? ' active' : '');
+  btn.style.background = c;
+  if (c === '#ffffff') btn.style.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,0.25)';
+  btn.addEventListener('pointerdown', () => {
+    colorRow.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    color  = c;
+    eraser = false;
+    document.getElementById('btn-eraser').classList.remove('active');
+    syncCtx();
+  });
+  colorRow.appendChild(btn);
+});
+
+/* ─── Size buttons ─── */
+document.querySelectorAll('.size-btn').forEach(btn => {
+  btn.addEventListener('pointerdown', () => {
+    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    size = parseInt(btn.dataset.size);
+    syncCtx();
+  });
+});
+
+/* ─── Tool buttons ─── */
+document.getElementById('btn-eraser').addEventListener('pointerdown', () => {
+  eraser = !eraser;
+  document.getElementById('btn-eraser').classList.toggle('active', eraser);
+  syncCtx();
+});
+document.getElementById('btn-undo').addEventListener('pointerdown', undo);
+document.getElementById('btn-clear').addEventListener('pointerdown', clearCanvas);
+document.getElementById('btn-restart').addEventListener('pointerdown', () => show('screen-start'));
+document.getElementById('btn-start').addEventListener('pointerdown', startGame);
+
+/* ─── Sync canvas context style ─── */
+function syncCtx() {
+  const w = eraser ? size * 3 : size;
+  ctx.strokeStyle = eraser ? '#ffffff' : color;
+  ctx.fillStyle   = eraser ? '#ffffff' : color;
+  ctx.lineWidth   = w;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+}
+
+/* ─── Resize canvas to fill its CSS box ─── */
+function resizeCanvas() {
+  const r = canvas.getBoundingClientRect();
+  const w = Math.floor(r.width);
+  const h = Math.floor(r.height);
+  if (!w || !h) return;
+  canvas.width  = w;
+  canvas.height = h;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+  syncCtx();
+}
+
+/* ─── Drawing ─── */
+function getPos(e) {
+  const r  = canvas.getBoundingClientRect();
+  const sx = canvas.width  / r.width;
+  const sy = canvas.height / r.height;
+  return {
+    x: (e.clientX - r.left) * sx,
+    y: (e.clientY - r.top)  * sy,
+  };
+}
+
+function onStart(e) {
+  drawing = true;
+  const p = getPos(e);
+  lastX = p.x; lastY = p.y;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function onMove(e) {
+  if (!drawing) return;
+  const p = getPos(e);
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+  lastX = p.x; lastY = p.y;
+}
+
+function onEnd() {
+  if (!drawing) return;
+  drawing = false;
+  saveUndo();
+}
+
+/* Mouse */
+canvas.addEventListener('mousedown',  onStart);
+canvas.addEventListener('mousemove',  onMove);
+canvas.addEventListener('mouseup',    onEnd);
+canvas.addEventListener('mouseleave', onEnd);
+
+/* Touch */
+canvas.addEventListener('touchstart', e => { e.preventDefault(); onStart(e.touches[0]); }, { passive: false });
+canvas.addEventListener('touchmove',  e => { e.preventDefault(); onMove(e.touches[0]);  }, { passive: false });
+canvas.addEventListener('touchend',   e => { e.preventDefault(); onEnd();                }, { passive: false });
+
+/* ─── Undo ─── */
+function saveUndo() {
+  undoStack.push(canvas.toDataURL());
+  if (undoStack.length > 20) undoStack.shift();
+}
+
+function undo() {
+  if (undoStack.length <= 1) return;
+  undoStack.pop();
+  const img = new Image();
+  img.onload = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+  };
+  img.src = undoStack[undoStack.length - 1];
+}
+
+function clearCanvas() {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  syncCtx();
+  undoStack = [];
+  saveUndo();
+}
+
+/* ─── Game flow ─── */
+async function startGame() {
+  vibrate(30);
+  show('screen-loading');
+
+  try {
+    const id = Math.floor(Math.random() * MAX_ID) + 1;
+    const [pkRes, spRes] = await Promise.all([
+      fetch(`https://pokeapi.co/api/v2/pokemon/${id}`),
+      fetch(`https://pokeapi.co/api/v2/pokemon-species/${id}`),
+    ]);
+
+    if (!pkRes.ok || !spRes.ok) throw new Error('fetch failed');
+
+    const pk = await pkRes.json();
+    const sp = await spRes.json();
+
+    const jaName = (
+      sp.names.find(n => n.language.name === 'ja-Hrkt')?.name ||
+      sp.names.find(n => n.language.name === 'ja')?.name      ||
+      pk.name
+    );
+
+    const imgUrl = (
+      pk.sprites?.other?.['official-artwork']?.front_default ||
+      pk.sprites?.front_default
+    );
+
+    /* Preload image before revealing */
+    await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload  = res;
+      i.onerror = rej;
+      i.src = imgUrl;
+    });
+
+    document.getElementById('pokemon-img').src = imgUrl;
+    document.getElementById('pokemon-name').textContent = jaName;
+
+    startReveal();
+  } catch (err) {
+    console.error(err);
+    show('screen-start');
+    alert('ポケモンの読み込みに失敗しました。もう一度試してください。');
+  }
+}
+
+function startReveal() {
+  show('screen-reveal');
+  vibrate([50, 50, 50]);
+
+  const TOTAL   = 3;
+  const CIRCUM  = 2 * Math.PI * 40; // 251.2
+  const fillEl  = document.getElementById('c-fill');
+  const numEl   = document.getElementById('cd-num');
+
+  /* Reset ring (no transition) */
+  fillEl.style.transition      = 'none';
+  fillEl.style.strokeDashoffset = '0';
+  numEl.textContent             = TOTAL;
+
+  /* Force reflow, then animate the full depletion */
+  fillEl.getBoundingClientRect();
+  fillEl.style.transition       = `stroke-dashoffset ${TOTAL}s linear`;
+  fillEl.style.strokeDashoffset = String(CIRCUM);
+
+  let left = TOTAL;
+  const tick = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(tick);
+      startDraw();
+    } else {
+      numEl.textContent = left;
+      vibrate(20);
+    }
+  }, 1000);
+}
+
+function startDraw() {
+  show('screen-draw');
+  vibrate([30, 30, 80]);
+
+  requestAnimationFrame(() => {
+    resizeCanvas();
+    undoStack = [];
+    saveUndo();
+    syncCtx();
+  });
+}
+
+/* ─── Haptic ─── */
+function vibrate(pattern) {
+  try { navigator.vibrate?.(pattern); } catch (_) {}
+}
+
+/* ─── Init ─── */
+syncCtx();
+</script>
+</body>
+</html>
